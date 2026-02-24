@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>股息率管理工具</title>
+<style>
+/* ── 基础重置 ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif; background: #eef2f7; color: #1a1a2e; min-height: 100vh; }
+
+/* ── 顶栏 ── */
+.topbar {
+  background: linear-gradient(135deg, #1565c0 0%, #0d47a1 100%);
+  color: #fff; padding: 18px 32px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.topbar h1 { font-size: 20px; letter-spacing: 1px; }
+.topbar .sub { font-size: 12px; opacity: .75; margin-top: 3px; }
+.rate-badge {
+  background: rgba(255,255,255,.15); border-radius: 20px;
+  padding: 6px 14px; font-size: 13px;
+}
+
+/* ── 主容器 ── */
+.main { max-width: 1600px; margin: 0 auto; padding: 24px 20px; }
+
+/* ── 卡片 ── */
+.card {
+  background: #fff; border-radius: 14px;
+  box-shadow: 0 2px 12px rgba(0,0,0,.08);
+  padding: 24px; margin-bottom: 22px;
+}
+
+/* ── 搜索区 ── */
+.search-row { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-end; }
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field label { font-size: 12px; color: #666; font-weight: 600; letter-spacing: .5px; }
+.field input[type=text] {
+  padding: 10px 14px; border: 1.5px solid #dde3ec; border-radius: 9px;
+  font-size: 14px; width: 230px; transition: border-color .2s;
+  font-family: inherit;
+}
+.field input[type=text]:focus { border-color: #1565c0; outline: none; }
+
+.market-toggle { display: flex; gap: 0; border-radius: 9px; overflow: hidden; border: 1.5px solid #dde3ec; }
+.market-toggle button {
+  padding: 10px 22px; border: none; background: #fff; font-size: 14px;
+  cursor: pointer; font-family: inherit; transition: all .2s; color: #555;
+}
+.market-toggle button.active { background: #1565c0; color: #fff; font-weight: 700; }
+
+.btn-primary {
+  padding: 10px 28px; background: #1565c0; color: #fff; border: none;
+  border-radius: 9px; font-size: 14px; font-weight: 700; cursor: pointer;
+  font-family: inherit; transition: background .2s; display: flex; align-items: center; gap: 8px;
+}
+.btn-primary:hover { background: #0d47a1; }
+.btn-primary:disabled { background: #90a4ae; cursor: not-allowed; }
+
+.search-tip { margin-top: 10px; font-size: 13px; color: #e53935; min-height: 18px; }
+
+/* ── 表格区 ── */
+.table-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; }
+.table-header h2 { font-size: 16px; color: #333; }
+.table-wrap { overflow: auto; max-height: calc(100vh - 200px); }
+
+table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; white-space: nowrap; }
+thead th {
+  background: #f4f7fb; padding: 11px 10px; text-align: center;
+  font-weight: 700; color: #444;
+  border-bottom: 2px solid #e0e8f0; border-right: 1px solid #e8edf3;
+  position: sticky; top: 0; z-index: 2;
+}
+thead th.yield-header { background: #dbeafe; color: #1e40af; }
+tbody td {
+  padding: 10px 8px; text-align: center;
+  border-bottom: 1px solid #f0f4f8; border-right: 1px solid #f5f7fa;
+  vertical-align: middle;
+}
+tbody tr:hover td { background: #f8fafc; }
+tbody tr:last-child td { border-bottom: none; }
+
+/* ── 固定列：序号（第1列）── */
+thead th:nth-child(1) {
+  position: sticky; left: 0; z-index: 3;
+  min-width: 48px; width: 48px;
+  border-right: 1px solid #e0e8f0;
+}
+tbody td:nth-child(1) {
+  position: sticky; left: 0; z-index: 1;
+  background: #fff;
+  border-right: 1px solid #edf0f5;
+}
+tbody tr:hover td:nth-child(1) { background: #f8fafc; }
+
+/* ── 固定列：股票名称（第2列）── */
+thead th:nth-child(2) {
+  position: sticky; left: 48px; z-index: 3;
+  min-width: 100px;
+  border-right: 2px solid #c5d5e8; /* 加粗右边框作为固定区分隔线 */
+}
+tbody td:nth-child(2) {
+  position: sticky; left: 48px; z-index: 1;
+  background: #fff;
+  border-right: 2px solid #e0e8f0;
+}
+tbody tr:hover td:nth-child(2) { background: #f8fafc; }
+
+/* ── 市场标签 ── */
+.tag {
+  display: inline-block; padding: 2px 9px; border-radius: 10px;
+  font-size: 11px; font-weight: 700;
+}
+.tag-a  { background: #e3f2fd; color: #1565c0; }
+.tag-hk { background: #f3e5f5; color: #6a1b9a; }
+
+/* ── 内联编辑输入框 ── */
+.inline-input {
+  width: 90px; padding: 5px 7px; border: 1.5px solid #e0e0e0;
+  border-radius: 7px; font-size: 13px; text-align: center;
+  font-family: inherit; transition: border-color .2s;
+}
+.inline-input:focus { border-color: #1565c0; outline: none; }
+.inline-input.edited { border-color: #ff6f00; background: #fff8e1; }
+
+.unit { font-size: 11px; color: #999; margin-left: 2px; }
+
+/* ── 目标价格 ── */
+.target-price {
+  background: #eff6ff; color: #1e40af; font-weight: 700;
+  padding: 4px 10px; border-radius: 7px; font-size: 13px;
+  display: inline-block; min-width: 64px;
+}
+.target-price.na { background: #f5f5f5; color: #bbb; font-weight: 400; }
+
+/* ── 股息率徽章 ── */
+.yield-badge {
+  display: inline-block; padding: 3px 11px; border-radius: 12px;
+  font-weight: 700; font-size: 13px;
+}
+.yg { background: #e8f5e9; color: #2e7d32; }   /* >= 4% 绿色 */
+.ym { background: #fff3e0; color: #e65100; }   /* 3~4% 橙色 */
+.yl { background: #fce4ec; color: #c62828; }   /* < 3%  红色 */
+
+/* ── 自定义计算器 ── */
+.calc-wrap { display: flex; align-items: center; gap: 6px; justify-content: center; }
+.calc-input {
+  width: 78px; padding: 5px 6px; border: 1.5px solid #e0e0e0;
+  border-radius: 7px; font-size: 12px; text-align: center; font-family: inherit;
+}
+.calc-input:focus { border-color: #1565c0; outline: none; }
+.calc-result { font-size: 13px; font-weight: 700; min-width: 52px; color: #999; }
+
+/* ── 操作按钮 ── */
+.btn-sm {
+  padding: 4px 10px; border: none; border-radius: 6px;
+  cursor: pointer; font-size: 12px; font-family: inherit; margin: 0 2px;
+  transition: opacity .2s;
+}
+.btn-sm:hover { opacity: .8; }
+.btn-refresh { background: #e8f0fe; color: #1565c0; }
+.btn-delete  { background: #fce4ec; color: #c62828; }
+
+/* ── 空状态 ── */
+.empty-state { text-align: center; padding: 64px 20px; color: #aaa; }
+.empty-state .icon { font-size: 52px; margin-bottom: 12px; }
+.empty-state p { font-size: 14px; }
+
+/* ── Toast ── */
+.toast {
+  position: fixed; top: 24px; right: 24px; z-index: 9999;
+  padding: 12px 22px; border-radius: 10px; font-size: 14px; color: #fff;
+  box-shadow: 0 4px 20px rgba(0,0,0,.18); transition: opacity .35s;
+  background: #323232;
+}
+.toast.success { background: #2e7d32; }
+.toast.error   { background: #c62828; }
+.toast.info    { background: #1565c0; }
+
+/* ── 转圈动画 ── */
+.spinner {
+  display: inline-block; width: 14px; height: 14px;
+  border: 2px solid rgba(255,255,255,.4); border-top-color: #fff;
+  border-radius: 50%; animation: spin .7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── 手动修改提示 ── */
+.manual-hint { font-size: 11px; color: #ff6f00; display: block; margin-top: 2px; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div>
+    <div class="h1"><h1>股息率管理工具</h1></div>
+    <div class="sub">支持 A 股 / 港股 &nbsp;|&nbsp; 自动抓取分红 &nbsp;|&nbsp; 多档位目标价格</div>
+  </div>
+  <div id="rateDisplay" class="rate-badge">港元汇率加载中...</div>
+</div>
+
+<div class="main">
+
+  <!-- 搜索区 -->
+  <div class="card">
+    <div class="search-row">
+      <div class="field">
+        <label>股票名称 / 代码</label>
+        <input type="text" id="queryInput" placeholder="如: 贵州茅台 或 600519" />
+      </div>
+      <div class="field">
+        <label>市场</label>
+        <div class="market-toggle">
+          <button id="btnA"  class="active" onclick="selectMarket('A')">A 股</button>
+          <button id="btnHK"           onclick="selectMarket('HK')">港 股</button>
+        </div>
+      </div>
+      <button class="btn-primary" id="searchBtn" onclick="doSearch()">
+        获取并添加
+      </button>
+    </div>
+    <div class="search-tip" id="searchTip"></div>
+  </div>
+
+  <!-- 表格区 -->
+  <div class="card">
+    <div class="table-header">
+      <h2>持仓股息率跟踪</h2>
+      <div style="display:flex;align-items:center;gap:10px">
+        <input type="text" id="filterInput" placeholder="搜索已添加的股票..."
+               oninput="filterStocks(this.value)"
+               style="padding:7px 14px;border:1.5px solid #dde3ec;border-radius:8px;
+                      font-size:13px;width:200px;font-family:inherit;outline:none;"
+               onfocus="this.style.borderColor='#1565c0'"
+               onblur="this.style.borderColor='#dde3ec'" />
+        <span id="filterCount" style="font-size:13px;color:#999;white-space:nowrap"></span>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>序号</th>
+            <th>股票名称</th>
+            <th>代码</th>
+            <th>市场</th>
+            <th>每股分红<br/>(原币)</th>
+            <th>每股分红<br/>(人民币)</th>
+            <th>当前价格<br/>(原币)</th>
+            <th>当前股息率</th>
+            <th class="yield-header">3.0%<br/>目标价</th>
+            <th class="yield-header">3.5%<br/>目标价</th>
+            <th class="yield-header">4.0%<br/>目标价</th>
+            <th class="yield-header">5.0%<br/>目标价</th>
+            <th class="yield-header">6.0%<br/>目标价</th>
+            <th>输入价格<br/>→ 股息率</th>
+            <th>近两次分红日</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="stockBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<script>
+// ── 状态 ──────────────────────────────────────────
+let stocks = [];
+let market = 'A';
+let hkdRate = 0.924;
+const YIELDS = [0.03, 0.035, 0.04, 0.05, 0.06];
+
+// ── 初始化 ───────────────────────────────────────
+window.addEventListener('DOMContentLoaded', async () => {
+  document.getElementById('queryInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') doSearch();
+  });
+  await refreshRate();
+  await loadStocks();
+});
+
+async function refreshRate() {
+  try {
+    const r = await fetch('/api/hkd_rate');
+    const d = await r.json();
+    hkdRate = d.rate;
+    document.getElementById('rateDisplay').textContent =
+      `港元汇率：1 HKD = ${hkdRate.toFixed(4)} CNY`;
+  } catch {
+    document.getElementById('rateDisplay').textContent = '港元汇率：0.9240（默认）';
+  }
+}
+
+async function loadStocks() {
+  try {
+    const r = await fetch('/api/stocks');
+    stocks = await r.json();
+    render();
+  } catch (e) {
+    toast('加载数据失败: ' + e.message, 'error');
+  }
+}
+
+// ── 市场切换 ─────────────────────────────────────
+function selectMarket(m) {
+  market = m;
+  document.getElementById('btnA') .classList.toggle('active', m === 'A');
+  document.getElementById('btnHK').classList.toggle('active', m === 'HK');
+}
+
+// ── 搜索并添加 ───────────────────────────────────
+async function doSearch() {
+  const query = document.getElementById('queryInput').value.trim();
+  if (!query) { setTip('请输入股票名称或代码', true); return; }
+
+  const btn = document.getElementById('searchBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> 搜索中...';
+  setTip('');
+
+  try {
+    const r = await fetch('/api/search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query, market }),
+    });
+    const d = await r.json();
+    if (d.error) { setTip(d.error, true); return; }
+    if (d.errors?.length) setTip('提示: ' + d.errors.join(' | '), false);
+
+    // 更新全局汇率（如果后端返回了最新值）
+    if (d.hkd_rate) {
+      hkdRate = d.hkd_rate;
+      document.getElementById('rateDisplay').textContent =
+        `港元汇率：1 HKD = ${hkdRate.toFixed(4)} CNY`;
+    }
+
+    const stock = {
+      symbol:            d.symbol,
+      name:              d.name || d.symbol,
+      market:            d.market,
+      dividend:          d.dividend,
+      dividend_dates:    d.dividend_dates || [],
+      dividend_currency: d.dividend_currency || (d.market === 'A' ? 'CNY' : 'HKD'),
+      hkd_rate:          d.hkd_rate || hkdRate,
+      current_price:     d.current_price,
+      manual_dividend:   false,
+    };
+
+    const sr = await fetch('/api/stocks', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(stock),
+    });
+    const saved = await sr.json();
+    stocks.push(saved);
+    render();
+    document.getElementById('queryInput').value = '';
+    toast('已添加: ' + stock.name, 'success');
+  } catch (e) {
+    setTip('请求失败: ' + e.message, true);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '获取并添加';
+  }
+}
+
+// ── 核心计算 ─────────────────────────────────────
+function divCNY(stock) {
+  if (stock.dividend == null) return null;
+  if (stock.market === 'HK' && stock.dividend_currency === 'HKD') {
+    return stock.dividend * (stock.hkd_rate || hkdRate);
+  }
+  return stock.dividend;
+}
+
+/** 目标价格（原币） */
+function targetPrice(stock, yieldRate) {
+  const d = stock.dividend;
+  if (!d || d <= 0) return null;
+  return d / yieldRate;
+}
+
+/** 当前股息率（原币计算，单位 %） */
+function currentYield(stock) {
+  const d = stock.dividend;
+  const p = stock.current_price;
+  if (!d || !p || p <= 0) return null;
+  return (d / p) * 100;
+}
+
+function yieldClass(pct) {
+  if (pct == null) return '';
+  return pct >= 4 ? 'yg' : pct >= 3 ? 'ym' : 'yl';
+}
+
+function fmtPrice(val, decimals = 2) {
+  if (val == null) return '-';
+  return Number(val).toFixed(decimals);
+}
+
+// ── 渲染 ─────────────────────────────────────────
+let _filterKeyword = '';
+
+function filterStocks(kw) {
+  _filterKeyword = kw.trim().toLowerCase();
+  render();
+}
+
+function render() {
+  const tbody = document.getElementById('stockBody');
+  if (!stocks.length) {
+    tbody.innerHTML = `<tr><td colspan="16">
+      <div class="empty-state">
+        <div class="icon">&#128202;</div>
+        <p>暂无股票，请在上方搜索并添加</p>
+      </div></td></tr>`;
+    document.getElementById('filterCount').textContent = '';
+    return;
+  }
+
+  const visible = _filterKeyword
+    ? stocks.filter(s =>
+        s.name  .toLowerCase().includes(_filterKeyword) ||
+        s.symbol.toLowerCase().includes(_filterKeyword))
+    : stocks;
+
+  const countEl = document.getElementById('filterCount');
+  countEl.textContent = _filterKeyword
+    ? `找到 ${visible.length} / ${stocks.length} 支`
+    : `共 ${stocks.length} 支`;
+
+  if (!visible.length) {
+    tbody.innerHTML = `<tr><td colspan="16">
+      <div class="empty-state" style="padding:30px 20px">
+        <p>没有匹配"${escHtml(_filterKeyword)}"的股票</p>
+      </div></td></tr>`;
+    return;
+  }
+
+  // 序号按原始列表位置显示，不因过滤重排
+  tbody.innerHTML = visible.map(s => buildRow(s, stocks.indexOf(s) + 1)).join('');
+}
+
+function buildRow(s, idx) {
+  const id  = s.id;
+  const cy  = currentYield(s);
+  const dc  = divCNY(s);
+  const mkt = s.market === 'A' ? 'A股' : '港股';
+  const mktTag = `<span class="tag tag-${s.market.toLowerCase()}">${mkt}</span>`;
+  const cur = s.market === 'HK' ? 'HKD' : '¥';
+
+  // 每股分红原币
+  const divCell = `
+    <div style="display:flex;align-items:center;gap:4px;justify-content:center">
+      <input class="inline-input${s.manual_dividend ? ' edited' : ''}"
+             type="number" step="0.0001" min="0"
+             value="${s.dividend ?? ''}"
+             placeholder="手动输入"
+             onchange="updateDividend('${id}', this)"
+             title="可手动修改分红数据" />
+      <span class="unit">${cur}</span>
+    </div>
+    ${s.manual_dividend ? '<span class="manual-hint">已手动修改</span>' : ''}
+  `;
+
+  // 每股分红人民币
+  const divCNYCell = dc != null
+    ? `<span style="color:#1565c0;font-weight:600">¥${dc.toFixed(4)}</span>`
+    : '<span style="color:#ccc">-</span>';
+
+  // 当前价格（可手动修改）
+  const priceCell = `
+    <div style="display:flex;align-items:center;gap:4px;justify-content:center">
+      <input class="inline-input"
+             type="number" step="0.01" min="0"
+             value="${s.current_price ?? ''}"
+             placeholder="输入价格"
+             onchange="updatePrice('${id}', this)"
+             title="可手动修改当前价格" />
+      <span class="unit">${cur}</span>
+    </div>
+  `;
+
+  // 当前股息率
+  const yieldCell = cy != null
+    ? `<span class="yield-badge ${yieldClass(cy)}">${cy.toFixed(2)}%</span>`
+    : '<span style="color:#ccc">-</span>';
+
+  // 目标价格列
+  const targetCells = YIELDS.map(y => {
+    const p = targetPrice(s, y);
+    const html = p != null
+      ? `<span class="target-price">${p.toFixed(2)}<span style="font-size:10px;font-weight:400;margin-left:2px">${cur}</span></span>`
+      : `<span class="target-price na">-</span>`;
+    return `<td>${html}</td>`;
+  }).join('');
+
+  // 自定义计算
+  const calcCell = `
+    <div class="calc-wrap">
+      <input class="calc-input" type="number" step="0.01" min="0"
+             placeholder="输入价格"
+             oninput="calcCustomYield('${id}', this)" />
+      <span class="calc-result" id="cy_${id}">-</span>
+    </div>
+  `;
+
+  return `
+  <tr data-id="${id}">
+    <td style="color:#999;font-size:12px;font-weight:600">${idx}</td>
+    <td><strong>${escHtml(s.name)}</strong></td>
+    <td style="color:#888;font-size:12px">${escHtml(s.symbol)}</td>
+    <td>${mktTag}</td>
+    <td>${divCell}</td>
+    <td>${divCNYCell}</td>
+    <td>${priceCell}</td>
+    <td>${yieldCell}</td>
+    ${targetCells}
+    <td>${calcCell}</td>
+    <td>${buildDatesCell(s.dividend_dates)}</td>
+    <td>
+      <button class="btn-sm btn-refresh" onclick="refreshStock('${id}')">刷新</button>
+      <button class="btn-sm btn-delete"  onclick="deleteStock('${id}')">删除</button>
+    </td>
+  </tr>`;
+}
+
+// ── 手动修改分红 ─────────────────────────────────
+async function updateDividend(id, input) {
+  const val = parseFloat(input.value);
+  const s   = stocks.find(x => x.id === id);
+  if (!s) return;
+
+  s.dividend        = isNaN(val) ? null : val;
+  s.manual_dividend = true;
+  input.classList.add('edited');
+
+  await apiPut(id, { dividend: s.dividend, manual_dividend: true });
+  render();
+  toast('分红已更新', 'info');
+}
+
+// ── 手动修改价格 ─────────────────────────────────
+async function updatePrice(id, input) {
+  const val = parseFloat(input.value);
+  const s   = stocks.find(x => x.id === id);
+  if (!s) return;
+
+  s.current_price = isNaN(val) ? null : val;
+  await apiPut(id, { current_price: s.current_price });
+  render();
+}
+
+// ── 自定义价格 → 股息率 ──────────────────────────
+function calcCustomYield(id, input) {
+  const s    = stocks.find(x => x.id === id);
+  const span = document.getElementById(`cy_${id}`);
+  if (!s || !span) return;
+
+  const price = parseFloat(input.value);
+  const d     = s.dividend;
+
+  if (!isNaN(price) && price > 0 && d > 0) {
+    const pct = (d / price) * 100;
+    span.textContent = pct.toFixed(2) + '%';
+    span.className   = 'calc-result yield-badge ' + yieldClass(pct);
+  } else {
+    span.textContent = '-';
+    span.className   = 'calc-result';
+    span.style.color = '#999';
+  }
+}
+
+// ── 刷新单支股票 ─────────────────────────────────
+async function refreshStock(id) {
+  const s = stocks.find(x => x.id === id);
+  if (!s) return;
+
+  toast('正在刷新...', 'info');
+  try {
+    const r = await fetch('/api/search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: s.symbol, market: s.market }),
+    });
+    const d = await r.json();
+
+    const updates = {};
+    if (!s.manual_dividend && d.dividend != null) {
+      updates.dividend = d.dividend;
+      s.dividend = d.dividend;
+    }
+    if (d.dividend_dates?.length) {
+      updates.dividend_dates = d.dividend_dates;
+      s.dividend_dates = d.dividend_dates;
+    }
+    if (d.current_price != null) {
+      updates.current_price = d.current_price;
+      s.current_price = d.current_price;
+    }
+    if (d.hkd_rate) {
+      updates.hkd_rate = d.hkd_rate;
+      s.hkd_rate = d.hkd_rate;
+      hkdRate = d.hkd_rate;
+    }
+
+    await apiPut(id, updates);
+    render();
+    toast('刷新成功', 'success');
+    if (d.errors?.length) setTip('刷新提示: ' + d.errors.join(' | '), false);
+  } catch (e) {
+    toast('刷新失败: ' + e.message, 'error');
+  }
+}
+
+// ── 删除 ─────────────────────────────────────────
+async function deleteStock(id) {
+  if (!confirm('确认删除此股票？')) return;
+  await fetch(`/api/stocks/${id}`, { method: 'DELETE' });
+  stocks = stocks.filter(x => x.id !== id);
+  render();
+  toast('已删除', '');
+}
+
+// ── 工具函数 ─────────────────────────────────────
+async function apiPut(id, data) {
+  return fetch(`/api/stocks/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+}
+
+function setTip(msg, isErr = false) {
+  const el = document.getElementById('searchTip');
+  el.textContent = msg;
+  el.style.color = isErr ? '#e53935' : '#e65100';
+}
+
+function buildDatesCell(dates) {
+  if (!dates || !dates.length) {
+    return '<span style="color:#ccc;font-size:12px">-</span>';
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  // 历史日期行
+  const lines = dates.map((d, i) => {
+    const label = i === 0 ? '最近' : '上次';
+    return `<div style="font-size:12px;color:#555">
+              <span style="color:#999;font-size:10px">${label}：</span>${d}
+            </div>`;
+  });
+
+  // 预测下次：每个历史日期各自 +365 天，取最近的未来日期
+  // 这样能正确处理"中期+末期"两种股息交替的情况
+  const candidates = dates
+    .map(d => new Date(new Date(d).getTime() + 365 * 86400000))
+    .filter(d => d > today);
+
+  let hint = '';
+  if (candidates.length > 0) {
+    const next  = new Date(Math.min(...candidates));
+    const nStr  = next.toISOString().slice(0, 10);
+    const nDays = Math.round((next - today) / 86400000);
+    const color = nDays <= 60 ? '#e65100' : '#2e7d32';
+    hint = `<div style="font-size:11px;color:${color};margin-top:2px">
+              预计下次: ${nStr}（约${nDays}天后）
+            </div>`;
+  }
+
+  return lines.join('') + hint;
+}
+
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+let _toastTimer;
+function toast(msg, type = '') {
+  const old = document.querySelector('.toast');
+  if (old) old.remove();
+  clearTimeout(_toastTimer);
+
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.textContent = msg;
+  document.body.appendChild(el);
+
+  _toastTimer = setTimeout(() => {
+    el.style.opacity = '0';
+    setTimeout(() => el.remove(), 400);
+  }, 2800);
+}
+</script>
+</body>
+</html>

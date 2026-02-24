@@ -1,0 +1,16 @@
+# 本地缓存与数据
+data.json
+cache_a_stocks.json
+cache_hk_stocks.json
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.env
+venv/
+.venv/
+
+# IDE
+.vscode/
+.idea/
