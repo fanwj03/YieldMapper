@@ -487,8 +487,9 @@ def delete_stock(stock_id):
 
 
 if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 5000))
     print("=" * 50)
     print("  股息率管理工具已启动")
-    print("  请用浏览器打开: http://localhost:5000")
+    print(f"  请用浏览器打开: http://localhost:{port}")
     print("=" * 50)
-    app.run(debug=True, port=5000, host='0.0.0.0')
+    app.run(debug=False, port=port, host='0.0.0.0')
